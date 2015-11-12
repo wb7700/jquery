@@ -14,13 +14,12 @@ define( [
 	"./css/adjustCSS",
 	"./css/addGetHookIf",
 	"./css/support",
-	"./css/showHide",
 
 	"./core/init",
 	"./core/ready",
 	"./selector" // contains
 ], function( jQuery, pnum, access, rmargin, document, rcssNum, rnumnonpx, cssExpand,
-	isHidden, getStyles, swap, curCSS, adjustCSS, addGetHookIf, support, showHide ) {
+	isHidden, getStyles, swap, curCSS, adjustCSS, addGetHookIf, support ) {
 
 var
 
@@ -28,8 +27,6 @@ var
 	// except "table", "table-cell", or "table-caption"
 	// See here for display values: https://developer.mozilla.org/en-US/docs/CSS/display
 	rdisplayswap = /^(none|table(?!-c[ea]).+)/,
-	rnumsplit = new RegExp( "^(" + pnum + ")(.*)$", "i" ),
-
 	cssShow = { position: "absolute", visibility: "hidden", display: "block" },
 	cssNormalTransform = {
 		letterSpacing: "0",
@@ -60,11 +57,14 @@ function vendorPropName( name ) {
 }
 
 function setPositiveNumber( elem, value, subtract ) {
-	var matches = rnumsplit.exec( value );
+
+	// Any relative (+/-) values have already been
+	// normalized at this point
+	var matches = rcssNum.exec( value );
 	return matches ?
 
 		// Guard against undefined "subtract", e.g., when used as in cssHooks
-		Math.max( 0, matches[ 1 ] - ( subtract || 0 ) ) + ( matches[ 2 ] || "px" ) :
+		Math.max( 0, matches[ 2 ] - ( subtract || 0 ) ) + ( matches[ 3 ] || "px" ) :
 		value;
 }
 
@@ -307,7 +307,7 @@ jQuery.extend( {
 		// Make numeric if forced or a qualifier was provided and val looks numeric
 		if ( extra === "" || extra ) {
 			num = parseFloat( val );
-			return extra === true || jQuery.isNumeric( num ) ? num || 0 : val;
+			return extra === true || isFinite( num ) ? num || 0 : val;
 		}
 		return val;
 	}
@@ -337,19 +337,41 @@ jQuery.each( [ "height", "width" ], function( i, name ) {
 		},
 
 		set: function( elem, value, extra ) {
-			var styles = extra && getStyles( elem );
-			return setPositiveNumber( elem, value, extra ?
-				augmentWidthOrHeight(
+			var matches,
+				styles = extra && getStyles( elem ),
+				subtract = extra && augmentWidthOrHeight(
 					elem,
 					name,
 					extra,
 					jQuery.css( elem, "boxSizing", false, styles ) === "border-box",
 					styles
-				) : 0
-			);
+				);
+
+			// Convert to pixels if value adjustment is needed
+			if ( subtract && ( matches = rcssNum.exec( value ) ) &&
+				( matches[ 3 ] || "px" ) !== "px" ) {
+
+				elem.style[ name ] = value;
+				value = jQuery.css( elem, name );
+			}
+
+			return setPositiveNumber( elem, value, subtract );
 		}
 	};
 } );
+
+jQuery.cssHooks.marginLeft = addGetHookIf( support.reliableMarginLeft,
+	function( elem, computed ) {
+		if ( computed ) {
+			return ( parseFloat( curCSS( elem, "marginLeft" ) ) ||
+				elem.getBoundingClientRect().left -
+					swap( elem, { marginLeft: 0 }, function() {
+						return elem.getBoundingClientRect().left;
+					} )
+				) + "px";
+		}
+	}
+);
 
 // These hooks are used by animate to expand properties
 jQuery.each( {
@@ -401,25 +423,6 @@ jQuery.fn.extend( {
 				jQuery.style( elem, name, value ) :
 				jQuery.css( elem, name );
 		}, name, value, arguments.length > 1 );
-	},
-	show: function() {
-		return showHide( this, true );
-	},
-	hide: function() {
-		return showHide( this );
-	},
-	toggle: function( state ) {
-		if ( typeof state === "boolean" ) {
-			return state ? this.show() : this.hide();
-		}
-
-		return this.each( function() {
-			if ( isHidden( this ) ) {
-				jQuery( this ).show();
-			} else {
-				jQuery( this ).hide();
-			}
-		} );
 	}
 } );
 

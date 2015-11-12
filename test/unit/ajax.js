@@ -38,7 +38,7 @@ QUnit.module( "ajax", {
 	);
 
 	ajaxTest( "jQuery.ajax() - success callbacks", 8, function( assert ) {
-	    return {
+		return {
 			setup: addGlobalEvents( "ajaxStart ajaxStop ajaxSend ajaxComplete ajaxSuccess", assert ),
 			url: url( "data/name.html" ),
 			beforeSend: function() {
@@ -64,6 +64,44 @@ QUnit.module( "ajax", {
 			},
 			success: function() {
 				assert.ok( true, "success" );
+			},
+			complete: function() {
+				assert.ok( true, "complete" );
+			}
+		};
+	} );
+
+	ajaxTest( "jQuery.ajax() - execute js for crossOrigin when dataType option is provided", 3,
+		function( assert ) {
+			return {
+				create: function( options ) {
+					options.crossDomain = true;
+					options.dataType = "script";
+					return jQuery.ajax( url( "data/script.php?header=ecma" ), options );
+				},
+				success: function() {
+					assert.ok( true, "success" );
+				},
+				complete: function() {
+					assert.ok( true, "complete" );
+				}
+			};
+		}
+	);
+
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin)", 2, function( assert ) {
+		return {
+			create: function( options ) {
+				options.crossDomain = true;
+				return jQuery.ajax( url( "data/script.php" ), options );
+			},
+			success: function() {
+				assert.ok( true, "success" );
+			},
+			fail: function() {
+				if (jQuery.support.cors === false) {
+					assert.ok( true, "fail" );
+				}
 			},
 			complete: function() {
 				assert.ok( true, "complete" );
@@ -393,6 +431,25 @@ QUnit.module( "ajax", {
 				assert.strictEqual( xhr.readyState, 0, "XHR readyState indicates successful abortion" );
 			},
 			error: true,
+			complete: function() {
+				assert.ok( true, "complete" );
+			}
+		};
+	} );
+
+	ajaxTest( "jQuery.ajax() - native abort", 2, function( assert ) {
+		return {
+			url: url( "data/name.php?wait=1" ),
+			xhr: function() {
+				var xhr = new window.XMLHttpRequest();
+				setTimeout( function() {
+					xhr.abort();
+				}, 100 );
+				return xhr;
+			},
+			error: function( xhr, msg ) {
+				assert.strictEqual( msg, "error", "Native abort triggers error callback" );
+			},
 			complete: function() {
 				assert.ok( true, "complete" );
 			}
@@ -1091,6 +1148,48 @@ QUnit.module( "ajax", {
 		};
 	} );
 
+	ajaxTest( "jQuery.ajax() - data - x-www-form-urlencoded (gh-2658)", 1, function( assert ) {
+		return {
+			url: "bogus.html",
+			data: { devo: "A Beautiful World" },
+			type: "post",
+			beforeSend: function( _, s ) {
+				assert.strictEqual( s.data, "devo=A+Beautiful+World", "data is '+'-encoded" );
+				return false;
+			},
+			error: true
+		};
+	} );
+
+	ajaxTest( "jQuery.ajax() - data - text/plain (gh-2658)", 1, function( assert ) {
+		return {
+			url: "bogus.html",
+			data: { devo: "A Beautiful World" },
+			type: "post",
+			contentType: "text/plain",
+			beforeSend: function( _, s ) {
+				assert.strictEqual( s.data, "devo=A%20Beautiful%20World", "data is %20-encoded" );
+				return false;
+			},
+			error: true
+		};
+	} );
+
+	ajaxTest( "jQuery.ajax() - data - no processing ", 1, function( assert ) {
+		return {
+			url: "bogus.html",
+			data: { devo: "A Beautiful World" },
+			type: "post",
+			contentType: "x-special-sauce",
+			processData: false,
+			beforeSend: function( _, s ) {
+				assert.deepEqual( s.data, { devo: "A Beautiful World" }, "data is not processed" );
+				return false;
+			},
+			error: true
+		};
+	} );
+
 	var ifModifiedNow = new Date();
 
 	jQuery.each(
@@ -1561,6 +1660,30 @@ QUnit.module( "ajax", {
 		};
 	} );
 
+if ( typeof window.ArrayBuffer === "undefined" || typeof new XMLHttpRequest().responseType !== "string" ) {
+
+	QUnit.skip( "No ArrayBuffer support in XHR", jQuery.noop );
+} else {
+
+	// No built-in support for binary data, but it's easy to add via a prefilter
+	jQuery.ajaxPrefilter( "arraybuffer", function ( s ) {
+		s.xhrFields = { responseType: "arraybuffer" };
+		s.responseFields.arraybuffer = "response";
+		s.converters[ "binary arraybuffer" ] = true;
+	});
+
+	ajaxTest( "gh-2498 - jQuery.ajax() - binary data shouldn't throw an exception", 2, function( assert ) {
+		return {
+			url: url( "data/1x1.jpg" ),
+			dataType: "arraybuffer",
+			success: function( data, s, jqxhr ) {
+				assert.ok( data instanceof window.ArrayBuffer, "correct data type" );
+				assert.ok( jqxhr.response instanceof window.ArrayBuffer, "data in jQXHR" );
+			}
+		};
+	} );
+}
+
 	QUnit.asyncTest( "#11743 - jQuery.ajax() - script, throws exception", 1, function( assert ) {
 
 		// Support: Android 2.3 only
@@ -1729,24 +1852,125 @@ QUnit.module( "ajax", {
 			done: function( data ) {
 				assert.ok( false, "done: " + data );
 			},
-				fail: function( jqXHR, status, error ) {
-					assert.ok( true, "exception caught: " + error );
-					assert.strictEqual( jqXHR.status, 0, "proper status code" );
-					assert.strictEqual( status, "error", "proper status" );
-				}
-			}, {
-				url: "http://domain.org:80d",
-				done: function( data ) {
-					assert.ok( false, "done: " + data );
-				},
-				fail: function( _, status, error ) {
-					assert.ok( true, "fail: " + status + " - " + error );
-				}
-			} ];
-		}
-	);
+			fail: function( jqXHR, status, error ) {
+				assert.ok( true, "exception caught: " + error );
+				assert.strictEqual( jqXHR.status, 0, "proper status code" );
+				assert.strictEqual( status, "error", "proper status" );
+			}
+		}, {
+			url: "http://" + externalHost + ":80q",
+			done: function( data ) {
+				assert.ok( false, "done: " + data );
+			},
+			fail: function( _, status, error ) {
+				assert.ok( true, "fail: " + status + " - " + error );
+			}
+		} ];
+	} );
 
-// //----------- jQuery.ajaxPrefilter()
+	ajaxTest( "gh-2587 - when content-type not xml, but looks like one", 1, function( assert ) {
+		return {
+			url: url( "data/ajax/content-type.php" ),
+			data: {
+				"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				"response": "<test/>"
+			},
+			success: function( result ) {
+				assert.strictEqual(
+					typeof result,
+					"string",
+					"Should handle it as a string, not xml"
+				);
+			}
+		};
+	} );
+
+	ajaxTest( "gh-2587 - when content-type not xml, but looks like one", 1, function( assert ) {
+		return {
+			url: url( "data/ajax/content-type.php" ),
+			data: {
+				"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				"response": "<test/>"
+			},
+			success: function( result ) {
+				assert.strictEqual(
+					typeof result,
+					"string",
+					"Should handle it as a string, not xml"
+				);
+			}
+		};
+	} );
+
+	ajaxTest( "gh-2587 - when content-type not json, but looks like one", 1, function( assert ) {
+		return {
+			url: url( "data/ajax/content-type.php" ),
+			data: {
+				"content-type": "test/jsontest",
+				"response": JSON.stringify({test: "test"})
+			},
+			success: function( result ) {
+				assert.strictEqual(
+					typeof result,
+					"string",
+					"Should handle it as a string, not json"
+				);
+			}
+		};
+	} );
+
+	ajaxTest( "gh-2587 - when content-type not html, but looks like one", 1, function( assert ) {
+		return {
+			url: url( "data/ajax/content-type.php" ),
+			data: {
+				"content-type": "test/htmltest",
+				"response": "<p>test</p>"
+			},
+			success: function( result ) {
+				assert.strictEqual(
+					typeof result,
+					"string",
+					"Should handle it as a string, not html"
+				);
+			}
+		};
+	} );
+
+	ajaxTest( "gh-2587 - when content-type not javascript, but looks like one", 1, function( assert ) {
+		return {
+			url: url( "data/ajax/content-type.php" ),
+			data: {
+				"content-type": "test/testjavascript",
+				"response": "alert(1)"
+			},
+			success: function( result ) {
+				assert.strictEqual(
+					typeof result,
+					"string",
+					"Should handle it as a string, not javascript"
+				);
+			}
+		};
+	} );
+
+	ajaxTest( "gh-2587 - when content-type not ecmascript, but looks like one", 1, function( assert ) {
+		return {
+			url: url( "data/ajax/content-type.php" ),
+			data: {
+				"content-type": "test/testjavascript",
+				"response": "alert(1)"
+			},
+			success: function( result ) {
+				assert.strictEqual(
+					typeof result,
+					"string",
+					"Should handle it as a string, not ecmascript"
+				);
+			}
+		};
+	} );
+
+//----------- jQuery.ajaxPrefilter()
 
 	ajaxTest( "jQuery.ajaxPrefilter() - abort", 1, function( assert ) {
 		return {

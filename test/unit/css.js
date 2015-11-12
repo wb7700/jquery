@@ -471,6 +471,9 @@ QUnit.test( "css(Object) where values are Functions with incoming values", funct
 	jQuery( "#cssFunctionTest" ).remove();
 } );
 
+// .show(), .hide(), can be excluded from the build
+if ( jQuery.fn.show && jQuery.fn.hide ) {
+
 QUnit.test( "show(); hide()", function( assert ) {
 
 	assert.expect( 4 );
@@ -636,7 +639,34 @@ QUnit.test( "show() resolves correct default display for detached nodes", functi
 	span.remove();
 } );
 
-QUnit.test( "toggle()", function( assert ) {
+QUnit.test( "hide hidden elements (bug #7141)", function( assert ) {
+	assert.expect( 3 );
+
+	var div = jQuery( "<div style='display:none'></div>" ).appendTo( "#qunit-fixture" );
+	assert.equal( div.css( "display" ), "none", "Element is hidden by default" );
+	div.hide();
+	assert.ok( !jQuery._data( div, "olddisplay" ), "olddisplay is undefined after hiding an already-hidden element" );
+	div.show();
+	assert.equal( div.css( "display" ), "block", "Show a double-hidden element" );
+
+	div.remove();
+} );
+
+QUnit.test( "show() after hide() should always set display to initial value (#14750)", function( assert ) {
+	assert.expect( 1 );
+
+	var div = jQuery( "<div />" ),
+		fixture = jQuery( "#qunit-fixture" );
+
+	fixture.append( div );
+
+	div.css( "display", "inline" ).hide().show().css( "display", "list-item" ).hide().show();
+	assert.equal( div.css( "display" ), "list-item", "should get last set display value" );
+} );
+
+}
+
+QUnit[ jQuery.find.compile && jQuery.fn.toggle ? "test" : "skip" ]( "toggle()", function( assert ) {
 	assert.expect( 9 );
 	var div, oldHide,
 		x = jQuery( "#foo" );
@@ -669,19 +699,6 @@ QUnit.test( "toggle()", function( assert ) {
 	jQuery.fn.hide = oldHide;
 } );
 
-QUnit.test( "hide hidden elements (bug #7141)", function( assert ) {
-	assert.expect( 3 );
-
-	var div = jQuery( "<div style='display:none'></div>" ).appendTo( "#qunit-fixture" );
-	assert.equal( div.css( "display" ), "none", "Element is hidden by default" );
-	div.hide();
-	assert.ok( !jQuery._data( div, "olddisplay" ), "olddisplay is undefined after hiding an already-hidden element" );
-	div.show();
-	assert.equal( div.css( "display" ), "block", "Show a double-hidden element" );
-
-	div.remove();
-} );
-
 QUnit.test( "jQuery.css(elem, 'height') doesn't clear radio buttons (bug #1095)", function( assert ) {
 	assert.expect( 4 );
 
@@ -707,17 +724,31 @@ QUnit.test( "internal ref to elem.runtimeStyle (bug #7608)", function( assert ) 
 	assert.ok( result, "elem.runtimeStyle does not throw exception" );
 } );
 
-QUnit.test( "marginRight computed style (bug #3333)", function( assert ) {
-	assert.expect( 1 );
+QUnit.test( "computed margins (trac-3333; gh-2237)", function( assert ) {
+	assert.expect( 2 );
 
-	var $div = jQuery( "#foo" );
+	var $div = jQuery( "#foo" ),
+		$child = jQuery( "#en" );
+
 	$div.css( {
 		"width": "1px",
 		"marginRight": 0
 	} );
+	assert.equal( $div.css( "marginRight" ), "0px",
+		"marginRight correctly calculated with a width and display block" );
 
-	assert.equal( $div.css( "marginRight" ), "0px", "marginRight correctly calculated with a width and display block" );
-} );
+	$div.css({
+		position: "absolute",
+		top: 0,
+		left: 0,
+		width: "100px"
+	});
+	$child.css({
+		width: "50px",
+		margin: "auto"
+	});
+	assert.equal( $child.css( "marginLeft" ), "25px", "auto margins are computed to pixels" );
+});
 
 QUnit.test( "box model properties incorrectly returning % instead of px, see #10639 and #12088", function( assert ) {
 	assert.expect( 2 );
@@ -977,7 +1008,7 @@ QUnit.test( "css opacity consistency across browsers (#12685)", function( assert
 	assert.equal( Math.round( el.css( "opacity" ) * 100 ), 20, "remove opacity override" );
 } );
 
-QUnit.test( ":visible/:hidden selectors", function( assert ) {
+QUnit[ jQuery.find.compile ? "test" : "skip" ]( ":visible/:hidden selectors", function( assert ) {
 	assert.expect( 17 );
 
 	var $div, $table, $a;
@@ -1127,18 +1158,6 @@ QUnit.test(
 		window.setTimeout( done, 1000 );
 	}
 );
-
-QUnit.test( "show() after hide() should always set display to initial value (#14750)", function( assert ) {
-	assert.expect( 1 );
-
-	var div = jQuery( "<div />" ),
-		fixture = jQuery( "#qunit-fixture" );
-
-	fixture.append( div );
-
-	div.css( "display", "inline" ).hide().show().css( "display", "list-item" ).hide().show();
-	assert.equal( div.css( "display" ), "list-item", "should get last set display value" );
-} );
 
 // Support: IE < 11
 // We have to jump through the hoops here in order to test work with "order" CSS property,

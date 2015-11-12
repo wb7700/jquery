@@ -145,7 +145,7 @@ QUnit.test( "jQuery()", function( assert ) {
 		"Empty attributes object is not interpreted as a document (trac-8950)" );
 } );
 
-QUnit.test( "jQuery(selector, context)", function( assert ) {
+QUnit[ jQuery.find.compile ? "test" : "skip" ]( "jQuery(selector, context)", function( assert ) {
 	assert.expect( 3 );
 	assert.deepEqual( jQuery( "div p", "#qunit-fixture" ).get(), q( "sndp", "en", "sap" ), "Basic selector with string as context" );
 	assert.deepEqual( jQuery( "div p", q( "qunit-fixture" )[ 0 ] ).get(), q( "sndp", "en", "sap" ), "Basic selector with element as context" );
@@ -272,6 +272,19 @@ QUnit.test( "type", function( assert ) {
 	assert.equal( jQuery.type( new MyObject() ), "object", "Object" );
 } );
 
+QUnit.test( "type for `Symbol`", function( assert ) {
+	// Prevent reference errors
+	if( typeof Symbol !== "function" ) {
+		assert.expect( 0 );
+		return;
+	}
+
+	assert.expect( 2 );
+
+	assert.equal( jQuery.type( Symbol() ), "symbol", "Symbol" );
+	assert.equal( jQuery.type( Object( Symbol() ) ), "symbol", "Symbol" );
+});
+
 QUnit.asyncTest( "isPlainObject", function( assert ) {
 	assert.expect( 15 );
 
@@ -339,6 +352,15 @@ QUnit.asyncTest( "isPlainObject", function( assert ) {
 		window.iframeDone( Object, "iframes not supported" );
 	}
 } );
+
+//
+QUnit[ typeof Symbol === "function" ? "test" : "skip" ]( "isPlainObject(Symbol)", function( assert ) {
+	assert.expect( 2 );
+
+	assert.equal( jQuery.isPlainObject( Symbol() ), false, "Symbol" );
+	assert.equal( jQuery.isPlainObject( Object( Symbol() ) ), false, "Symbol inside an object" );
+} );
+
 
 QUnit.test( "isFunction", function( assert ) {
 	assert.expect( 19 );
@@ -452,8 +474,8 @@ QUnit.test( "isNumeric", function( assert ) {
 	assert.ok( t( 1.5999999999999999 ), "Very precise floating point number" );
 	assert.ok( t( 8e5 ), "Exponential notation" );
 	assert.ok( t( "123e-2" ), "Exponential notation string" );
-	assert.ok( t( new ToString( "42" ) ), "Custom .toString returning number" );
 
+	assert.equal( t( new ToString( "42" ) ), false, "Custom .toString returning number" );
 	assert.equal( t( "" ), false, "Empty string" );
 	assert.equal( t( "        " ), false, "Whitespace characters string" );
 	assert.equal( t( "\t\t" ), false, "Tab characters string" );
@@ -475,6 +497,13 @@ QUnit.test( "isNumeric", function( assert ) {
 	assert.equal( t( [ 42 ] ), false, "Array with one number" );
 	assert.equal( t( function() {} ), false, "Instance of a function" );
 	assert.equal( t( new Date() ), false, "Instance of a Date" );
+} );
+
+QUnit[ typeof Symbol === "function" ? "test" : "skip" ]( "isNumeric(Symbol)", function( assert ) {
+	assert.expect( 2 );
+
+	assert.equal( jQuery.isNumeric( Symbol() ), false, "Symbol" );
+	assert.equal( jQuery.isNumeric( Object( Symbol() ) ), false, "Symbol inside an object" );
 } );
 
 QUnit.test( "isXMLDoc - HTML", function( assert ) {
@@ -589,8 +618,12 @@ QUnit.test( "jQuery('html')", function( assert ) {
 
 	//equal( jQuery( "element[attribute=<div></div>]" ).length, 0,
 	//	"When html is within brackets, do not recognize as html." );
-	assert.equal( jQuery( "element:not(<div></div>)" ).length, 0,
-		"When html is within parens, do not recognize as html." );
+	if ( jQuery.find.compile ) {
+		assert.equal( jQuery( "element:not(<div></div>)" ).length, 0,
+			"When html is within parens, do not recognize as html." );
+	} else {
+		assert.ok( "skip", "Complex :not not supported in selector-native" );
+	}
 	assert.equal( jQuery( "\\<div\\>" ).length, 0, "Ignore escaped html characters" );
 } );
 
@@ -957,15 +990,82 @@ QUnit.test( "jQuery.grep()", function( assert ) {
 	assert.deepEqual( jQuery.grep( [], searchCriterion ), [], "Empty array" );
 	assert.deepEqual( jQuery.grep( new Array( 4 ), searchCriterion ), [], "Sparse array" );
 
-	assert.deepEqual( jQuery.grep( [ 1, 2, 3, 4, 5, 6 ], searchCriterion ), [ 2, 4, 6 ], "Satisfying elements present" );
-	assert.deepEqual( jQuery.grep( [ 1, 3, 5, 7 ], searchCriterion ), [], "Satisfying elements absent" );
+	assert.deepEqual(
+		jQuery.grep( [ 1, 2, 3, 4, 5, 6 ], searchCriterion ),
+		[ 2, 4, 6 ],
+		"Satisfying elements present"
+	);
+	assert.deepEqual(
+		jQuery.grep( [ 1, 3, 5, 7 ], searchCriterion ),
+		[],
+		"Satisfying elements absent"
+	);
 
-	assert.deepEqual( jQuery.grep( [ 1, 2, 3, 4, 5, 6 ], searchCriterion, true ), [ 1, 3, 5 ], "Satisfying elements present and grep inverted" );
-	assert.deepEqual( jQuery.grep( [ 1, 3, 5, 7 ], searchCriterion, true ), [ 1, 3, 5, 7 ], "Satisfying elements absent and grep inverted" );
+	assert.deepEqual(
+		jQuery.grep( [ 1, 2, 3, 4, 5, 6 ], searchCriterion, true ),
+		[ 1, 3, 5 ],
+		"Satisfying elements present and grep inverted"
+	);
+	assert.deepEqual(
+		jQuery.grep( [ 1, 3, 5, 7 ], searchCriterion, true ),
+		[ 1, 3, 5, 7 ],
+		"Satisfying elements absent and grep inverted"
+	);
 
-	assert.deepEqual( jQuery.grep( [ 1, 2, 3, 4, 5, 6 ], searchCriterion, false ), [ 2, 4, 6 ], "Satisfying elements present but grep explicitly uninverted" );
-	assert.deepEqual( jQuery.grep( [ 1, 3, 5, 7 ], searchCriterion, false ), [], "Satisfying elements absent and grep explicitly uninverted" );
+	assert.deepEqual(
+		jQuery.grep( [ 1, 2, 3, 4, 5, 6 ], searchCriterion, false ),
+		[ 2, 4, 6 ],
+		"Satisfying elements present but grep explicitly uninverted"
+	);
+	assert.deepEqual(
+		jQuery.grep( [ 1, 3, 5, 7 ], searchCriterion, false ),
+		[],
+		"Satisfying elements absent and grep explicitly uninverted"
+	);
 } );
+
+QUnit.test( "jQuery.grep(Array-like)", function( assert ) {
+	assert.expect( 7 );
+
+	var searchCriterion = function( value ) {
+		return value % 2 === 0;
+	};
+
+	assert.deepEqual( jQuery.grep( { length: 0 }, searchCriterion ), [], "Empty array-like" );
+
+	assert.deepEqual(
+		jQuery.grep( { 0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, length: 6 }, searchCriterion ),
+		[ 2, 4, 6 ],
+		"Satisfying elements present and array-like object used"
+	);
+	assert.deepEqual(
+		jQuery.grep( { 0: 1, 1: 3, 2: 5, 3: 7, length: 4 }, searchCriterion ),
+		[],
+		"Satisfying elements absent and Array-like object used"
+	);
+
+	assert.deepEqual(
+		jQuery.grep( { 0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, length: 6 }, searchCriterion, true ),
+		[ 1, 3, 5 ],
+		"Satisfying elements present, array-like object used, and grep inverted"
+	);
+	assert.deepEqual(
+		jQuery.grep( { 0: 1, 1: 3, 2: 5, 3: 7, length: 4 }, searchCriterion, true ),
+		[ 1, 3, 5, 7 ],
+		"Satisfying elements absent, array-like object used, and grep inverted"
+	);
+
+	assert.deepEqual(
+		jQuery.grep( { 0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, length: 6 }, searchCriterion, false ),
+		[ 2, 4, 6 ],
+		"Satisfying elements present, Array-like object used, but grep explicitly uninverted"
+	);
+	assert.deepEqual(
+		jQuery.grep( { 0: 1, 1: 3, 2: 5, 3: 7, length: 4 }, searchCriterion, false ),
+		[],
+		"Satisfying elements absent, Array-like object used, and grep explicitly uninverted"
+	);
+});
 
 QUnit.test( "jQuery.extend(Object, Object)", function( assert ) {
 	assert.expect( 28 );
@@ -1078,6 +1178,29 @@ QUnit.test( "jQuery.extend(Object, Object)", function( assert ) {
 	assert.deepEqual( defaults, defaultsCopy, "Check if not modified: options1 must not be modified" );
 	assert.deepEqual( options1, options1Copy, "Check if not modified: options1 must not be modified" );
 	assert.deepEqual( options2, options2Copy, "Check if not modified: options2 must not be modified" );
+} );
+
+QUnit.test( "jQuery.extend(Object, Object {created with \"defineProperties\"})", function( assert ) {
+	assert.expect( 2 );
+
+	var definedObj = Object.defineProperties({}, {
+        "enumerableProp": {
+          get: function () {
+            return true;
+          },
+          enumerable: true
+        },
+        "nonenumerableProp": {
+          get: function () {
+            return true;
+          }
+        }
+      }),
+      accessorObj = {};
+
+	jQuery.extend( accessorObj, definedObj );
+	assert.equal( accessorObj.enumerableProp, true, "Verify that getters are transferred" );
+	assert.equal( accessorObj.nonenumerableProp, undefined, "Verify that non-enumerable getters are ignored" );
 } );
 
 QUnit.test( "jQuery.extend(true,{},{a:[], o:{}}); deep copy with array, followed by object", function( assert ) {

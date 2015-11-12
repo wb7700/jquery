@@ -874,16 +874,10 @@ QUnit.test( "withinElement implemented with jQuery.contains()", function( assert
 	jQuery( "#qunit-fixture" ).append( "<div id='jc-outer'><div id='jc-inner'></div></div>" );
 
 	jQuery( "#jc-outer" ).on( "mouseenter mouseleave", function( event ) {
-
 		assert.equal( this.id, "jc-outer", this.id + " " + event.type );
+	} );
 
-	} ).trigger( "mouseenter" );
-
-	jQuery( "#jc-inner" ).trigger( "mousenter" );
-
-	jQuery( "#jc-outer" ).off( "mouseenter mouseleave" ).remove();
-	jQuery( "#jc-inner" ).remove();
-
+	jQuery( "#jc-inner" ).trigger( "mouseenter" );
 } );
 
 QUnit.test( "mouseenter, mouseleave don't catch exceptions", function( assert ) {
@@ -905,49 +899,6 @@ QUnit.test( "mouseenter, mouseleave don't catch exceptions", function( assert ) 
 		assert.equal( e, "an Exception", "mouseleave doesn't catch exceptions" );
 	}
 } );
-
-if ( jQuery.fn.click ) {
-
-	QUnit.test( "trigger() shortcuts", function( assert ) {
-		assert.expect( 5 );
-
-		var counter, clickCounter,
-			elem = jQuery( "<li><a href='#'>Change location</a></li>" ).prependTo( "#firstUL" );
-		elem.find( "a" ).on( "click", function() {
-			var close = jQuery( "spanx", this ); // same with jQuery(this).find("span");
-			assert.equal( close.length, 0, "Context element does not exist, length must be zero" );
-			assert.ok( !close[ 0 ], "Context element does not exist, direct access to element must return undefined" );
-			return false;
-		} ).click();
-
-		// manually clean up detached elements
-		elem.remove();
-
-		jQuery( "#check1" ).click( function() {
-			assert.ok( true, "click event handler for checkbox gets fired twice, see #815" );
-		} ).click();
-
-		counter = 0;
-		jQuery( "#firstp" )[ 0 ].onclick = function() {
-			counter++;
-		};
-		jQuery( "#firstp" ).click();
-		assert.equal( counter, 1, "Check that click, triggers onclick event handler also" );
-
-		clickCounter = 0;
-		jQuery( "#simon1" )[ 0 ].onclick = function() {
-			clickCounter++;
-		};
-		jQuery( "#simon1" ).click();
-		assert.equal( clickCounter, 1, "Check that click, triggers onclick event handler on an a tag also" );
-
-		// test that special handlers do not blow up with VML elements (#7071)
-		jQuery( "<xml:namespace ns='urn:schemas-microsoft-com:vml' prefix='v' />" ).appendTo( "head" );
-		jQuery( "<v:oval id='oval' style='width:100pt;height:75pt;' fillcolor='red'> </v:oval>" ).appendTo( "#form" );
-		jQuery( "#oval" ).click().keydown();
-	} );
-
-}
 
 QUnit.test( "trigger() bubbling", function( assert ) {
 	assert.expect( 18 );
@@ -1799,7 +1750,8 @@ QUnit.test( "jQuery.off using dispatched jQuery.Event", function( assert ) {
 		.remove();
 } );
 
-QUnit.test( "delegated event with delegateTarget-relative selector", function( assert ) {
+// selector-native does not support scope-fixing in delegation
+QUnit[ jQuery.find.compile ? "test" : "skip" ]( "delegated event with delegateTarget-relative selector", function( assert ) {
 	assert.expect( 3 );
 	var markup = jQuery( "<div><ul><li><a id=\"a0\"></a><ul id=\"ul0\"><li class=test><a id=\"a0_0\"></a></li><li><a id=\"a0_1\"></a></li></ul></li></ul></div>" ).appendTo( "#qunit-fixture" );
 
@@ -1856,6 +1808,33 @@ QUnit.test( "delegated event with intermediate DOM manipulation (#13208)", funct
 		assert.ok( true, "Element removed" );
 	} );
 	jQuery( "#anchor2" ).trigger( "click" );
+} );
+
+QUnit.test( "ignore comment nodes in event delegation (gh-2055)", function( assert ) {
+	assert.expect( 1 );
+
+	// Test if DOMNodeInserted is supported
+	// This is a back-up for when DOMNodeInserted support
+	// is eventually removed from browsers
+	function test() {
+		var ret = false;
+		var $fixture = jQuery( "#qunit-fixture" );
+		$fixture.on( "DOMNodeInserted", function() {
+			ret = true;
+			$fixture.off( "DOMNodeInserted" );
+		} ).append( "<div></div>" );
+		return ret;
+	}
+
+	var $foo = jQuery( "#foo" ).on( "DOMNodeInserted", "[id]", function() {
+		assert.ok( true, "No error thrown on comment node" );
+	} ),
+		$comment = jQuery( document.createComment( "comment" ) )
+			.appendTo( $foo.find( "#sap" ) );
+
+	if ( !test() ) {
+		fireNative( $comment[0], "DOMNodeInserted" );
+	}
 } );
 
 QUnit.test( "stopPropagation() stops directly-bound events on delegated target", function( assert ) {
@@ -2524,6 +2503,18 @@ testIframeWithCallback(
 	}
 );
 
+// need PHP here to make the incepted IFRAME hang
+if ( hasPHP ) {
+	testIframeWithCallback(
+		"jQuery.ready uses interactive",
+		"event/interactiveReady.html",
+		function( isOk, assert ) {
+			assert.expect( 1 );
+			assert.ok( isOk, "jQuery fires ready when the DOM can truly be interacted with" );
+		}
+	);
+}
+
 testIframeWithCallback(
 	"Focusing iframe element",
 	"event/focusElem.html",
@@ -2745,7 +2736,7 @@ QUnit.test( "preventDefault() on focusin does not throw exception", function( as
 				"Preventing default on focusin throws no exception" );
 
 			done();
-		} ).focus();
+		} ).trigger( "focus" );
 } );
 
 QUnit.test( "Donor event interference", function( assert ) {
@@ -2808,6 +2799,74 @@ QUnit.test( "originalEvent property for Chrome, Safari, Fx & Edge of simulated e
 		assert.ok( true, "got a focus event from the input" );
 	} );
 	jQuery( "#donor-input" ).trigger( "focus" );
+} );
+
+
+QUnit[ jQuery.fn.click ? "test" : "skip" ]( "trigger() shortcuts", function( assert ) {
+	assert.expect( 5 );
+
+	var counter, clickCounter,
+		elem = jQuery( "<li><a href='#'>Change location</a></li>" ).prependTo( "#firstUL" );
+	elem.find( "a" ).on( "click", function() {
+		var close = jQuery( "spanx", this ); // same with jQuery(this).find("span");
+		assert.equal( close.length, 0, "Context element does not exist, length must be zero" );
+		assert.ok( !close[ 0 ], "Context element does not exist, direct access to element must return undefined" );
+		return false;
+	} ).click();
+
+	// manually clean up detached elements
+	elem.remove();
+
+	jQuery( "#check1" ).click( function() {
+		assert.ok( true, "click event handler for checkbox gets fired twice, see #815" );
+	} ).click();
+
+	counter = 0;
+	jQuery( "#firstp" )[ 0 ].onclick = function() {
+		counter++;
+	};
+	jQuery( "#firstp" ).click();
+	assert.equal( counter, 1, "Check that click, triggers onclick event handler also" );
+
+	clickCounter = 0;
+	jQuery( "#simon1" )[ 0 ].onclick = function() {
+		clickCounter++;
+	};
+	jQuery( "#simon1" ).click();
+	assert.equal( clickCounter, 1, "Check that click, triggers onclick event handler on an a tag also" );
+} );
+
+QUnit[ jQuery.fn.click ? "test" : "skip" ]( "Event aliases", function( assert ) {
+
+	// Explicitly skipping focus/blur events due to their flakiness
+	var	$elem = jQuery( "<div />" ).appendTo( "#qunit-fixture" ),
+		aliases = ( "resize scroll click dblclick mousedown mouseup " +
+			"mousemove mouseover mouseout mouseenter mouseleave change " +
+			"select submit keydown keypress keyup contextmenu" ).split( " " );
+	assert.expect( aliases.length );
+
+	jQuery.each( aliases, function( i, name ) {
+
+		// e.g. $(elem).click(...).click();
+		$elem[ name ]( function( event ) {
+			assert.equal( event.type, name, "triggered " + name );
+		} )[ name ]().off( name );
+	} );
+} );
+
+// Support: IE9 (remove when IE9 is no longer supported)
+// https://msdn.microsoft.com/en-us/library/hh801223(v=vs.85).aspx
+QUnit.test( "VML with special event handlers (trac-7071)", function( assert ) {
+	assert.expect( 1 );
+
+	var ns = jQuery( "<xml:namespace ns='urn:schemas-microsoft-com:vml' prefix='v' />" ).appendTo( "head" );
+
+	jQuery( "<v:oval id='oval' style='width:100pt;height:75pt;' fillcolor='red'> </v:oval>" ).appendTo( "#form" );
+	jQuery( "#form" ).on( "keydown", function() {
+		assert.ok( true, "no error was thrown" );
+	} );
+	jQuery( "#oval" ).trigger( "click" ).trigger( "keydown" );
+	ns.remove();
 } );
 
 // These tests are unreliable in Firefox

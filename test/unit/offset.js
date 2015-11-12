@@ -186,13 +186,14 @@ testIframe( "offset/absolute", "absolute", function( $, window, document, assert
 } );
 
 testIframe( "offset/relative", "relative", function( $, window, document, assert ) {
-	assert.expect( 60 );
+	assert.expect( 64 );
 
 	// get offset
 	var tests = [
 		{ "id": "#relative-1",   "top":   7, "left":  7 },
 		{ "id": "#relative-1-1", "top":  15, "left": 15 },
-		{ "id": "#relative-2",   "top": 142, "left": 27 }
+		{ "id": "#relative-2",   "top": 142, "left": 27 },
+		{ "id": "#relative-2-1",   "top": 149, "left": 52 }
 	];
 	jQuery.each( tests, function() {
 		assert.equal( $( this[ "id" ] ).offset().top,  this[ "top" ],  "jQuery('" + this[ "id" ] + "').offset().top" );
@@ -203,7 +204,8 @@ testIframe( "offset/relative", "relative", function( $, window, document, assert
 	tests = [
 		{ "id": "#relative-1",   "top":   6, "left":  6 },
 		{ "id": "#relative-1-1", "top":   5, "left":  5 },
-		{ "id": "#relative-2",   "top": 141, "left": 26 }
+		{ "id": "#relative-2",   "top": 141, "left": 26 },
+		{ "id": "#relative-2-1",   "top": 5, "left": 5 }
 	];
 	jQuery.each( tests, function() {
 		assert.equal( $( this[ "id" ] ).position().top,  this[ "top" ],  "jQuery('" + this[ "id" ] + "').position().top" );
@@ -458,8 +460,8 @@ testIframe( "offset/scroll", "scroll", function( $, win, doc, assert ) {
 	assert.notEqual( $().scrollLeft( 100 ), null, "jQuery().scrollLeft(100) testing setter on empty jquery object" );
 	assert.notEqual( $().scrollTop( null ), null, "jQuery().scrollTop(null) testing setter on empty jquery object" );
 	assert.notEqual( $().scrollLeft( null ), null, "jQuery().scrollLeft(null) testing setter on empty jquery object" );
-	assert.strictEqual( $().scrollTop(), null, "jQuery().scrollTop(100) testing setter on empty jquery object" );
-	assert.strictEqual( $().scrollLeft(), null, "jQuery().scrollLeft(100) testing setter on empty jquery object" );
+	assert.strictEqual( $().scrollTop(), undefined, "jQuery().scrollTop() testing getter on empty jquery object" );
+	assert.strictEqual( $().scrollLeft(), undefined, "jQuery().scrollLeft() testing getter on empty jquery object" );
 
 	// Tests position after parent scrolling (#15239)
 	$( "#scroll-1" ).scrollTop( 0 );
@@ -548,7 +550,9 @@ QUnit.test( "fractions (see #7730 and #7885)", function( assert ) {
 
 	result = div.offset();
 
-	assert.equal( result.top, expected.top, "Check top" );
+	// Support: Chrome 45-46+
+	// In recent Chrome these values differ a little.
+	assert.ok( Math.abs( result.top - expected.top ) < 0.25, "Check top within 0.25 of expected" );
 	assert.equal( result.left, expected.left, "Check left" );
 
 	div.remove();

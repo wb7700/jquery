@@ -575,7 +575,7 @@ QUnit.test( "removeAttr(String)", function( assert ) {
 	assert.equal( jQuery( "#fx-test-group" ).attr( "height", "3px" ).removeAttr( "height" ).get( 0 ).style.height, "1px", "Removing height attribute has no effect on height set with style attribute" );
 
 	jQuery( "#check1" ).removeAttr( "checked" ).prop( "checked", true ).removeAttr( "checked" );
-	assert.equal( document.getElementById( "check1" ).checked, false, "removeAttr sets boolean properties to false" );
+	assert.equal( document.getElementById( "check1" ).checked, true, "removeAttr should not set checked to false, since the checked attribute does NOT mirror the checked property" );
 	jQuery( "#text1" ).prop( "readOnly", true ).removeAttr( "readonly" );
 	assert.equal( document.getElementById( "text1" ).readOnly, false, "removeAttr sets boolean properties to false" );
 
@@ -733,6 +733,13 @@ QUnit.test( "prop('tabindex')", function( assert ) {
 	assert.equal( jQuery( "#linkWithNoHrefWithNoTabIndex" ).prop( "tabindex" ), -1, "anchor without href, no tabindex set" );
 	assert.equal( jQuery( "#linkWithNoHrefWithTabIndex" ).prop( "tabindex" ), 1, "anchor without href, tabindex set to 2" );
 	assert.equal( jQuery( "#linkWithNoHrefWithNegativeTabIndex" ).prop( "tabindex" ), -1, "anchor without href, no tabindex set" );
+} );
+
+QUnit.test( "image.prop( 'tabIndex' )", function( assert ) {
+	assert.expect( 1 );
+	var image = jQuery("<img src='data/1x1.jpg' />")
+		.appendTo("#qunit-fixture");
+	assert.equal( image.prop("tabIndex" ), -1, "tabIndex on image" );
 } );
 
 QUnit.test( "prop('tabindex', value)", function( assert ) {
@@ -896,10 +903,10 @@ QUnit.test( "val() with non-matching values on dropdown list", function( assert 
 
 	var select6 = jQuery( "<select multiple id=\"select6\"><option value=\"1\">A</option><option value=\"2\">B</option></select>" ).appendTo( "#form" );
 	jQuery( select6 ).val( "nothing" );
-	assert.equal( jQuery( select6 ).val(), null, "Non-matching set (single value) on select-multiple" );
+	assert.deepEqual( jQuery( select6 ).val(), [], "Non-matching set (single value) on select-multiple" );
 
 	jQuery( select6 ).val( [ "nothing1", "nothing2" ] );
-	assert.equal( jQuery( select6 ).val(), null, "Non-matching set (array of values) on select-multiple" );
+	assert.deepEqual( jQuery( select6 ).val(), [], "Non-matching set (array of values) on select-multiple" );
 
 	select6.remove();
 } );
@@ -1221,7 +1228,7 @@ QUnit.test( "removeClass(undefined) is a no-op", function( assert ) {
 } );
 
 var testToggleClass = function( valueObj, assert ) {
-	assert.expect( 17 );
+	assert.expect( 11 );
 
 	var e = jQuery( "#firstp" );
 	assert.ok( !e.is( ".test" ), "Assert class not present" );
@@ -1233,8 +1240,12 @@ var testToggleClass = function( valueObj, assert ) {
 	// class name with a boolean
 	e.toggleClass( valueObj( "test" ), false );
 	assert.ok( !e.is( ".test" ), "Assert class not present" );
+	e.toggleClass( valueObj( "test" ), false );
+	assert.ok( !e.is( ".test" ), "Assert class still not present" );
 	e.toggleClass( valueObj( "test" ), true );
 	assert.ok( e.is( ".test" ), "Assert class present" );
+	e.toggleClass( valueObj( "test" ), true );
+	assert.ok( e.is( ".test" ), "Assert class still present" );
 	e.toggleClass( valueObj( "test" ), false );
 	assert.ok( !e.is( ".test" ), "Assert class not present" );
 
@@ -1245,29 +1256,6 @@ var testToggleClass = function( valueObj, assert ) {
 	assert.ok( ( e.is( ".testA.testC" ) && !e.is( ".testB" ) ), "Assert 1 class added, 1 class removed, and 1 class kept" );
 	e.toggleClass( valueObj( "testA testC" ) );
 	assert.ok( ( !e.is( ".testA" ) && !e.is( ".testB" ) && !e.is( ".testC" ) ), "Assert no class present" );
-
-	// toggleClass storage
-	e.toggleClass( true );
-	assert.ok( e[ 0 ].className === "", "Assert class is empty (data was empty)" );
-	e.addClass( "testD testE" );
-	assert.ok( e.is( ".testD.testE" ), "Assert class present" );
-	e.toggleClass();
-	assert.ok( !e.is( ".testD.testE" ), "Assert class not present" );
-	assert.ok( jQuery._data( e[ 0 ], "__className__" ) === "testD testE", "Assert data was stored" );
-	e.toggleClass();
-	assert.ok( e.is( ".testD.testE" ), "Assert class present (restored from data)" );
-	e.toggleClass( false );
-	assert.ok( !e.is( ".testD.testE" ), "Assert class not present" );
-	e.toggleClass( true );
-	assert.ok( e.is( ".testD.testE" ), "Assert class present (restored from data)" );
-	e.toggleClass();
-	e.toggleClass( false );
-	e.toggleClass();
-	assert.ok( e.is( ".testD.testE" ), "Assert class present (restored from data)" );
-
-	// Cleanup
-	e.removeClass( "testD" );
-	assert.expectJqData( this, e[ 0 ], "__className__" );
 };
 
 QUnit.test( "toggleClass(String|boolean|undefined[, boolean])", function( assert ) {
